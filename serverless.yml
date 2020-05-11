@@ -19,6 +19,8 @@ provider:
 functions:
   main:
     handler: index.handler
+    events:
+      - schedule: rate(2 hours)
     environment:
       S3_BUCKET_NAME:
         Ref: S3Bucket
