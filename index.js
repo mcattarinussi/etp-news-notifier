@@ -2,13 +2,16 @@ const AWS = require('aws-sdk');
 const cheerio = require('cheerio');
 const fetch = require('node-fetch');
 
-const { S3_BUCKET_NAME } = process.env;
-const NEWS_PAGE_URL = 'http://www.entetutelapesca.it/cms/it/istituzionale/amministrazione-trasparente/20info_ambientali';
+const ETP_ORIGIN = 'http://www.etpi.fvg.it';
+const ETP_NEWS_URL = ETP_ORIGIN + '/cms/it/istituzionale/amministrazione-trasparente/20info_ambientali';
+
+const { SNS_TOPIC_ARN, S3_BUCKET_NAME } = process.env;
 
 const s3 = new AWS.S3();
+const sns = new AWS.SNS();
 
 const fetchNewsPage = () =>
-    fetch(NEWS_PAGE_URL)
+    fetch(ETP_NEWS_URL)
         .then(resp => resp.text());
 
 const extractArticlesFromHtml = newsPageHtml => {
@@ -63,6 +66,12 @@ const detectNewArticles = (storedArticles, extractedArticles) => {
     return extractedArticles.filter(article => !storedArticlesHrefs.includes(article.href));
 };
 
+const makeSnsMessage = articles =>
+    'New articles published:\n' +
+    articles
+        .map(a => `- ${a.title || a.nodeIndex}: ${ETP_ORIGIN + a.href}`)
+        .join('\n');
+
 module.exports.handler = async () => {
     const storedArticles = await fetchStoredArticles();
     const extractedArticles = extractArticlesFromHtml(await fetchNewsPage());
@@ -82,7 +91,12 @@ module.exports.handler = async () => {
 
     console.log('Found new articles\n', JSON.stringify(newArticles, null, 4));
 
-    // send email/sms with new articles
+    console.log('Publishing message to SNS topic');
+    await sns.publish({
+        Message: makeSnsMessage(newArticles),
+        Subject: 'ETP (Informazioni ambientali) - New articles',
+        TopicArn: SNS_TOPIC_ARN
+    }).promise();
 
     console.log('Uploading updated articles to S3');
     await uploadArticles(extractedArticles);

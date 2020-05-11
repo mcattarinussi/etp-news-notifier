@@ -8,13 +8,16 @@ provider:
     - Effect: Allow
       Action:
         - "s3:ListBucket"
-      Resource: { "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3Bucket" }]] }
+      Resource: { Fn::Join: ["", ["arn:aws:s3:::", { Ref: S3Bucket }]] }
     - Effect: Allow
       Action:
         - "s3:PutObject"
         - "s3:GetObject"
-      Resource:
-        { "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3Bucket" }, "/*"]] }
+      Resource: { Fn::Join: ["", ["arn:aws:s3:::", { Ref: S3Bucket }, "/*"]] }
+    - Effect: Allow
+      Action:
+        - SNS:Publish
+      Resource: { Ref: SNSTopic }
 
 functions:
   main:
@@ -22,8 +25,8 @@ functions:
     events:
       - schedule: rate(2 hours)
     environment:
-      S3_BUCKET_NAME:
-        Ref: S3Bucket
+      SNS_TOPIC_ARN: { Ref: SNSTopic }
+      S3_BUCKET_NAME: { Ref: S3Bucket }
 
 resources:
   Resources:
@@ -32,3 +35,11 @@ resources:
       DeletionPolicy: Delete
       Properties:
         BucketName: etp-news-notifier
+    SNSTopic:
+      Type: AWS::SNS::Topic
+    SNSEmailSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Endpoint: ${ssm:/etp-news-notifier/target-email}
+        Protocol: email
+        TopicArn: { Ref: SNSTopic }
