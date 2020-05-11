@@ -41,7 +41,6 @@ const fetchStoredArticles = async () =>
         Key: 'articles.json'
     })
         .promise()
-        // .then(({ Body }) => console.log(Body.toString()))
         .then(({ Body }) => JSON.parse(Body.toString()))
         .catch(err => {
             if (err.code && err.code === 'NoSuchKey') {
@@ -59,7 +58,10 @@ const uploadArticles = async articles =>
     }).promise();
 
 
-const detectNewArticles = (storedArticles, extractedArticles) => [];
+const detectNewArticles = (storedArticles, extractedArticles) => {
+    const storedArticlesHrefs = storedArticles.map(({ href }) => href);
+    return extractedArticles.filter(article => !storedArticlesHrefs.includes(article.href));
+};
 
 module.exports.handler = async () => {
     const storedArticles = await fetchStoredArticles();
@@ -71,12 +73,17 @@ module.exports.handler = async () => {
         return;
     }
 
-    const newArticles = detectNewArticles(storedArticles, extractedArticles)
+    const newArticles = detectNewArticles(storedArticles, extractedArticles);
+
     if (!newArticles.length) {
-        console.log('No new articles found.')
+        console.log('No new articles found.');
+        return;
     }
 
-    // console.log new articles
-    // send sms with new articles
-    // await uploadArticles(extractedArticles)
+    console.log('Found new articles\n', JSON.stringify(newArticles, null, 4));
+
+    // send email/sms with new articles
+
+    console.log('Uploading updated articles to S3');
+    await uploadArticles(extractedArticles);
 };

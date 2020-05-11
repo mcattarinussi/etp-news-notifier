@@ -4,35 +4,24 @@ provider:
   name: aws
   runtime: nodejs12.x
   region: eu-west-1
-
-iamRoleStatements:
-  - Effect: "Allow"
-    Action:
-      - "s3:PutObject"
-      - "s3:GetObject"
-    Resource:
-      Fn::Join:
-        - ""
-        - - "arn:aws:s3:::"
-          - "Ref": "S3Bucket"
-          - "/*"
-
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
-
-# you can add packaging information here
-#package:
-#  include:
-#    - include-me.js
-#    - include-me-dir/**
-#  exclude:
-#    - exclude-me.js
-#    - exclude-me-dir/**
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "s3:ListBucket"
+      Resource: { "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3Bucket" }]] }
+    - Effect: Allow
+      Action:
+        - "s3:PutObject"
+        - "s3:GetObject"
+      Resource:
+        { "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3Bucket" }, "/*"]] }
 
 functions:
   main:
     handler: index.handler
+    environment:
+      S3_BUCKET_NAME:
+        Ref: S3Bucket
 
 resources:
   Resources:
