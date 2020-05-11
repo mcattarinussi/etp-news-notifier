@@ -31,8 +31,8 @@ const extractArticles = (pageHtml) => {
     return articles;
 };
 
-(async () => {
+module.exports.handler = async () => {
     const articles = extractArticles(await fetchNewsPage());
 
     console.log(articles);
-})();
+};
