@@ -1,14 +1,18 @@
+const AWS = require('aws-sdk');
 const cheerio = require('cheerio');
 const fetch = require('node-fetch');
 
+const { S3_BUCKET_NAME } = process.env;
 const NEWS_PAGE_URL = 'http://www.entetutelapesca.it/cms/it/istituzionale/amministrazione-trasparente/20info_ambientali';
+
+const s3 = new AWS.S3();
 
 const fetchNewsPage = () =>
     fetch(NEWS_PAGE_URL)
         .then(resp => resp.text());
 
-const extractArticles = (pageHtml) => {
-    const $ = cheerio.load(pageHtml);
+const extractArticlesFromHtml = newsPageHtml => {
+    const $ = cheerio.load(newsPageHtml);
     const articleNodes = $('#content-wrapper > .container > div p > a:nth-child(1)');
 
     const articles = [];
@@ -31,8 +35,48 @@ const extractArticles = (pageHtml) => {
     return articles;
 };
 
-module.exports.handler = async () => {
-    const articles = extractArticles(await fetchNewsPage());
+const fetchStoredArticles = async () =>
+    s3.getObject({
+        Bucket: S3_BUCKET_NAME,
+        Key: 'articles.json'
+    })
+        .promise()
+        // .then(({ Body }) => console.log(Body.toString()))
+        .then(({ Body }) => JSON.parse(Body.toString()))
+        .catch(err => {
+            if (err.code && err.code === 'NoSuchKey') {
+                return null;
+            }
 
-    console.log(articles);
+            throw err;
+        });
+
+const uploadArticles = async articles =>
+    s3.putObject({
+        Body: JSON.stringify(articles),
+        Bucket: S3_BUCKET_NAME,
+        Key: 'articles.json'
+    }).promise();
+
+
+const detectNewArticles = (storedArticles, extractedArticles) => [];
+
+module.exports.handler = async () => {
+    const storedArticles = await fetchStoredArticles();
+    const extractedArticles = extractArticlesFromHtml(await fetchNewsPage());
+
+    if (!storedArticles) {
+        console.log('No stored articles found. Uploading extracted articles to S3.');
+        await uploadArticles(extractedArticles);
+        return;
+    }
+
+    const newArticles = detectNewArticles(storedArticles, extractedArticles)
+    if (!newArticles.length) {
+        console.log('No new articles found.')
+    }
+
+    // console.log new articles
+    // send sms with new articles
+    // await uploadArticles(extractedArticles)
 };
